@@ -1,0 +1,32 @@
+name: Refresh subscription generator
+on:
+  schedule:
+    - cron: '43 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: subscription-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      STUDIO_API_BASE: https://subgen.tatotato.site
+      STUDIO_PUBLISH_KEY: ${{ secrets.STUDIO_PUBLISH_KEY }}
+      SING_BOX_BIN: .runtime-bin/sing-box
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Download and verify official sing-box
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 --output /tmp/sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.14.4/sing-box-1.14.4-linux-amd64.tar.gz
+          printf '%s  %s\n' '699a1b510aa4396b2176d32d1181920399ebf1e267835da6f3b598d0f7c24968' '/tmp/sing-box.tar.gz' | sha256sum --check -
+          mkdir -p .runtime-bin
+          tar -xzf /tmp/sing-box.tar.gz --strip-components=1 -C .runtime-bin
+          chmod 700 .runtime-bin/sing-box
+      - name: Test actual exits and publish one node per country
+        run: node cloud-run.mjs
